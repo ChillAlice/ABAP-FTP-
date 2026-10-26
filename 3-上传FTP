@@ -90,7 +90,36 @@ FORM frm_ftp_upload.
 
 ENDFORM. 
 
+//////////////////////////form 补充//////////////////////////
+尝试连接FTP
 
+FORM frm_ftp_cmd USING    pv_cmd TYPE any
+                 CHANGING pv_err TYPE any.
+
+  DATA: lv_cmd TYPE char255.
+
+  CLEAR pv_err.
+  lv_cmd = pv_cmd.
+  REFRESH gs_ftpres.
+
+  CALL FUNCTION 'FTP_COMMAND'
+    EXPORTING
+      handle        = gv_handle
+      command       = lv_cmd
+      compress      = ' '
+    TABLES
+      data          = gs_ftpres
+    EXCEPTIONS
+      command_error = 1
+      tcpip_error   = 2
+      data_error    = 3
+      OTHERS        = 4.
+
+  IF sy-subrc <> 0.
+    pv_err = abap_true.
+    RETURN.
+  ENDIF.
+//////////////////////////form 补充//////////////////////////
 断开FTP链接
 FORM frm_ftp_close.
 
