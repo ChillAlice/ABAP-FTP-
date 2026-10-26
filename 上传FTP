@@ -1,0 +1,107 @@
+其中需要加密下密码，最后上传，成功后需要断开FTP连接
+FORM frm_ftp_upload.
+
+  DATA: lv_cmd      TYPE char255,
+        lv_err      TYPE abap_bool,
+        lv_try      TYPE i,
+        pwd(30)     TYPE c,
+        l_sourcelen TYPE i,
+        key         TYPE i VALUE 26101957,
+        lv_rc       TYPE sy-subrc.
+  DATA: ls_011  TYPE zast011,
+        lv_dest TYPE rfcdest." VALUE 'SAPFTP',.
+  IF l_binary_tab IS INITIAL.
+    RETURN.
+  ENDIF.
+  IF sy-batch IS INITIAL.
+    lv_dest = 'SAPFTP'.
+  ELSE.
+    lv_dest = 'SAPFTPA'.
+  ENDIF.
+  "取配置信息
+  SELECT SINGLE * INTO ls_011 FROM zast011 WHERE interfacename = 'MDC'
+    AND zdesc = 'MDC'.
+*转换密码
+  l_sourcelen = strlen( ls_011-zpassword ).
+  CALL FUNCTION 'HTTP_SCRAMBLE'
+    EXPORTING
+      source      = ls_011-zpassword
+      sourcelen   = l_sourcelen
+      key         = key
+    IMPORTING
+      destination = pwd.
+*---- 1. 连接(带重试) --------------------------------------------------*
+  CLEAR gv_handle.
+  DO c_retry TIMES.
+    lv_try = sy-index.
+    CALL FUNCTION 'FTP_CONNECT'
+      EXPORTING
+        user            = ls_011-zuser
+        password        = pwd
+        host            = ls_011-zhost
+        rfc_destination = lv_dest
+      IMPORTING
+        handle          = gv_handle
+      EXCEPTIONS
+        OTHERS          = 1.
+    lv_rc = sy-subrc.
+    IF lv_rc = 0 AND gv_handle > 0.
+      EXIT.
+    ENDIF.
+    WAIT UP TO c_wait SECONDS.
+  ENDDO.
+  IF ls_011-zdir IS NOT INITIAL.
+    CONCATENATE 'cd' ls_011-zdir INTO lv_cmd SEPARATED BY space.
+    PERFORM frm_ftp_cmd USING lv_cmd CHANGING lv_err.
+    IF lv_err = abap_true.
+      CONCATENATE 'FTP 目录不存在或无权限:' ls_011-zdir INTO gv_msg
+             SEPARATED BY space.
+      PERFORM frm_ftp_close.
+      MESSAGE gv_msg TYPE 'E'.
+    ENDIF.
+  ENDIF.
+*---- 3. 上传 -----------------------------------------------------------*
+  REFRESH gs_ftpres.
+  CONCATENATE 'put' gv_apfile gv_remfile INTO lv_cmd SEPARATED BY space.
+
+  CALL FUNCTION 'FTP_R3_TO_SERVER'
+    EXPORTING
+      handle         = gv_handle
+      fname          = gv_remfile
+      blob_length    = l_length
+      character_mode = ' '
+    TABLES
+      blob           = l_binary_tab
+    EXCEPTIONS
+      tcpip_error    = 1
+      command_error  = 2
+      data_error     = 3
+      OTHERS         = 4.
+  IF lv_err = abap_true.
+    PERFORM frm_ftp_close.
+    MESSAGE 'FTP 上传失败，请查看 FTP 返回报文' TYPE 'E'.
+  ENDIF.
+
+  CONCATENATE 'FTP 上传完成：' ls_011-zdir '/' gv_remfile INTO gv_msg.
+  CONDENSE gv_msg NO-GAPS.
+
+*---- 4. 断开 -----------------------------------------------------------*
+  PERFORM frm_ftp_close.
+
+ENDFORM. 
+
+
+断开FTP链接
+FORM frm_ftp_close.
+
+  CHECK gv_handle > 0.
+
+  CALL FUNCTION 'FTP_DISCONNECT'
+    EXPORTING
+      handle = gv_handle
+    EXCEPTIONS
+      OTHERS = 1.
+
+  CLEAR gv_handle.
+
+ENDFORM. 
