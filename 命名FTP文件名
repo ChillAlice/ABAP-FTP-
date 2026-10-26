@@ -1,0 +1,4 @@
+ CONCATENATE  'aircraft_assembly_' sy-datum INTO gv_remfile.
+  CONCATENATE gv_remfile '.'  'CSV'      INTO gv_remfile.
+
+  CONDENSE gv_remfile NO-GAPS.
