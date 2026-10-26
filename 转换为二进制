@@ -1,0 +1,179 @@
+拼接XLS的抬头行描述，string转为Xstring 在转换为二进制
+FORM frm_convert_xls.
+  CONSTANTS:  gc_tab  TYPE c VALUE cl_rsda_csv_converter=>c_default_separator ," cl_bcs_convert=>gc_tab,"分隔符,
+              gc_crlf TYPE string VALUE cl_abap_char_utilities=>cr_lf. "换行符 \r\n
+  "DATA: c_mimetype TYPE char64 VALUE 'APPLICATION/MSEXCEL;charset=GBK'."
+  DATA: c_mimetype TYPE char64 VALUE '"text/html;charset=gb2312"'."
+  DATA: v_xattach TYPE xstring.
+  DATA: lv_string TYPE string.
+  DATA: name TYPE string.
+  DATA:BEGIN OF i_qmel OCCURS 0,
+         qmart LIKE qmel-qmart,
+         qmdat LIKE qmel-qmdat,
+         mzeit LIKE qmel-mzeit,
+         qmnum LIKE qmel-qmnum,
+       END OF i_qmel.
+  DATA: tsn TYPE string,
+        csn TYPE string,
+        dsn TYPE string,
+        tso TYPE string,
+        cso TYPE string,
+        dso TYPE string,
+        tsr TYPE string,
+        csr TYPE string,
+        dsr TYPE string,
+        tst TYPE string,
+        cst TYPE string,
+        dst TYPE string.
+
+  CONCATENATE '高级设备'
+              '高级设备/功能位置'
+              '高级设备件号'
+              '高级设备序号'
+              '设备编号'
+              '技术对象说明'
+              '件状'
+              '物料号'
+              '序列号'
+              '设备状态'
+              '原始装机号'
+              '功能位置'
+              '机号'
+              '机型'
+              '维护工厂'
+              '拆换日期'
+              'TSN'
+              'CSN'
+              'DSN'
+              'TSO'
+              'CSO'
+              'DSO'
+              'TSR'
+              'CSR'
+              'DSR'
+              'TST'
+              'CST'
+              'DST'
+              INTO lv_string SEPARATED BY gc_tab.
+  CONCATENATE lv_string gc_crlf INTO lv_string.
+
+  SORT gt_output2 BY msgrp.
+  LOOP AT gt_output2.
+    CLEAR: tsn,csn,dsn,tso,cso,dso,tsr,csr,dsr,tst,cst,dst.
+    CALL FUNCTION 'CONVERSION_EXIT_TPLNR_OUTPUT'
+      EXPORTING
+        input  = gt_output2-tplnr
+      IMPORTING
+        output = gt_output2-tplnr.
+    CALL FUNCTION 'CONVERSION_EXIT_MATN1_OUTPUT'
+      EXPORTING
+        input  = gt_output2-hmatnr
+      IMPORTING
+        output = gt_output2-hmatnr.
+    CALL FUNCTION 'CONVERSION_EXIT_MATN1_OUTPUT'
+      EXPORTING
+        input  = gt_output2-matnr
+      IMPORTING
+        output = gt_output2-matnr.
+*最近一次安装日期
+    IF gt_output2-equnr IS NOT INITIAL.
+      CLEAR i_qmel[].
+      SELECT b~qmart b~qmdat b~mzeit
+        INTO TABLE i_qmel
+        FROM qmih AS a INNER JOIN qmel AS b ON a~qmnum = b~qmnum
+                       INNER JOIN jest AS c ON b~objnr = c~objnr
+       WHERE a~equnr = gt_output2-equnr
+         AND ( b~qmart = 'Z1' OR b~qmart = 'Z2')
+         AND c~inact = ''
+         AND stat <> 'I0076'.
+      SORT i_qmel BY qmdat DESCENDING mzeit DESCENDING.
+      READ TABLE i_qmel INDEX 1.
+      IF sy-subrc = 0 .
+        MOVE i_qmel-qmdat TO gt_output2-zchdat.
+      ENDIF.
+    ENDIF.
+*取设备状态
+    PERFORM frm_get_equi_sts USING gt_output2-objnr CHANGING gt_output2-zeqsttxt.
+    MODIFY gt_output2.
+
+    tsn =  gt_output2-ztsnv.
+    csn =  gt_output2-zcsnv.
+    dsn =  gt_output2-zdsnv.
+    tso =  gt_output2-ztsov.
+    cso =  gt_output2-zcsov.
+    dso =  gt_output2-zdsov.
+    tsr =  gt_output2-ztsrv.
+    csr =  gt_output2-zcsrv.
+    dsr =  gt_output2-zdsrv.
+    tst =  gt_output2-ztstv.
+    cst =  gt_output2-zcstv.
+    dst =  gt_output2-zdstv.
+
+    "高级设备1
+    CONCATENATE lv_string  gt_output2-hequi gc_tab INTO lv_string.
+    "高级设备/功能位置2
+    CONCATENATE lv_string  gt_output2-heqnr gc_tab INTO lv_string.
+    "高级设备件号3
+    CONCATENATE lv_string  gt_output2-hmatnr gc_tab INTO lv_string.
+    "高级设备序号4
+    CONCATENATE lv_string  gt_output2-zhgernr gc_tab INTO lv_string.
+    "设备编号5
+    CONCATENATE lv_string  gt_output2-equnr gc_tab INTO lv_string.
+    "技术对象说明6
+    CONCATENATE lv_string  gt_output2-eqktx gc_tab INTO lv_string.
+    "件状7
+    CONCATENATE lv_string  gt_output2-zzeqsts gc_tab INTO lv_string.
+    "件号8
+    CONCATENATE lv_string  gt_output2-matnr gc_tab INTO lv_string.
+    "序号9
+    CONCATENATE lv_string  gt_output2-sernr gc_tab INTO lv_string.
+    "设备状态10
+    CONCATENATE lv_string  gt_output2-zeqsttxt gc_tab INTO lv_string.
+    "原装机号11
+    CONCATENATE lv_string  gt_output2-zzmsgrpo gc_tab INTO lv_string.
+    "功能位置12
+    CONCATENATE lv_string  gt_output2-tplnr gc_tab INTO lv_string.
+    "机号13
+    CONCATENATE lv_string  gt_output2-msgrp gc_tab INTO lv_string.
+    "机型14
+    CONCATENATE lv_string  gt_output2-stort gc_tab INTO lv_string.
+    "维护工厂15
+    CONCATENATE lv_string  gt_output2-swerk gc_tab INTO lv_string.
+    "拆换日期16
+    CONCATENATE lv_string  gt_output2-zchdat gc_tab INTO lv_string.
+
+    CONCATENATE lv_string  tsn gc_tab INTO lv_string.
+    CONCATENATE lv_string  csn gc_tab INTO lv_string.
+    CONCATENATE lv_string  dsn gc_tab INTO lv_string.
+    CONCATENATE lv_string  tso gc_tab INTO lv_string.
+    CONCATENATE lv_string  cso gc_tab INTO lv_string.
+    CONCATENATE lv_string  dso gc_tab INTO lv_string.
+    CONCATENATE lv_string  tsr gc_tab INTO lv_string.
+    CONCATENATE lv_string  csr gc_tab INTO lv_string.
+    CONCATENATE lv_string  dsr gc_tab INTO lv_string.
+    CONCATENATE lv_string  tst gc_tab INTO lv_string.
+    CONCATENATE lv_string  cst gc_tab INTO lv_string.
+    CONCATENATE lv_string  dst gc_crlf INTO lv_string.
+
+  ENDLOOP.
+  CALL FUNCTION 'SCMS_STRING_TO_XSTRING'
+    EXPORTING
+      text     = lv_string
+      mimetype = c_mimetype
+    " encoding = '4103'
+    IMPORTING
+      buffer   = v_xattach
+    EXCEPTIONS
+      failed   = 1
+      OTHERS   = 2.
+
+  l_length = xstrlen( v_xattach ).
+
+  CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+    EXPORTING
+      buffer        = v_xattach
+    IMPORTING
+      output_length = l_length
+    TABLES
+      binary_tab    = l_binary_tab.
+ENDFORM.                    "FRM_CONVERT_XLS
